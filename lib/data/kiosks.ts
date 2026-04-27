@@ -1,0 +1,157 @@
+import type { Kiosk, KioskStatus } from "./types";
+
+type RawKiosk = {
+  id: string;
+  name: string;
+  city: string;
+  status: KioskStatus;
+  detail?: string;
+  monitors: number;
+  paper: "OK" | "Near end" | "Paper absent";
+  bill: "OK" | "Error" | "Not used";
+  last: string;
+  cashC: number;
+  cashA: number;
+  cardC: number;
+  cardA: number;
+  totC: number;
+  totA: number;
+  dealerId?: number;
+};
+
+const raw: RawKiosk[] = [
+  { id: "20001002", name: "Airport", city: "LEFKOSA", status: "Disabled", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-21 20:05:19", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 54 },
+  { id: "20001003", name: "Airport", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 01:01:18", cashC: 28, cashA: 5600, cardC: 3, cardA: 148280.75, totC: 5, totA: 153876.25, dealerId: 54 },
+  { id: "20001004", name: "Airport", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-23 21:08:58", cashC: 155, cashA: 30800, cardC: 5, cardA: 153876.25, totC: 8, totA: 184651.5, dealerId: 54 },
+  { id: "20001005", name: "METEHAN", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-21 00:58:38", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 57 },
+  { id: "20001006", name: "METEHAN2", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 15:10:02", cashC: 104, cashA: 20800, cardC: 2, cardA: 5595.5, totC: 3, totA: 25179.75, dealerId: 57 },
+  { id: "20001007", name: "GIRNE LIMAN", city: "GIRNE", status: "Disabled", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-20 09:03:17", cashC: 83, cashA: 14000, cardC: 10, cardA: 171309.25, totC: 14, totA: 185298, dealerId: 55 },
+  { id: "20001008", name: "GIRNE LIMAN2", city: "GIRNE", status: "Disabled", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-02 11:37:15", cashC: 0, cashA: 0, cardC: 3, cardA: 26748.25, totC: 3, totA: 26748.25, dealerId: 55 },
+  { id: "20001013", name: "Airport (AF)", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "Not used", last: "2026-04-24 09:10:00", cashC: 42, cashA: 8400, cardC: 0, cardA: 0, totC: 2, totA: 8393.25, dealerId: 54 },
+  { id: "20001014", name: "Airport (AF)", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 10:00:00", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 54 },
+  { id: "20001015", name: "Airport (AF)", city: "LEFKOSA", status: "Not Found", detail: "Paper near end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 12:11:58", cashC: 0, cashA: 0, cardC: 20, cardA: 320863.9, totC: 20, totA: 320863.9, dealerId: 54 },
+  { id: "20001016", name: "Airport (AF)", city: "LEFKOSA", status: "Disabled", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-18 10:00:00", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 54 },
+  { id: "20001017", name: "Airport (AF)", city: "LEFKOSA", status: "Disabled", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-19 10:00:00", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 54 },
+  { id: "20001019", name: "GIRNE LIMAN (AF)", city: "GIRNE", status: "Disabled", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-16 09:09:13", cashC: 42, cashA: 8400, cardC: 3, cardA: 13988.75, totC: 5, totA: 22382, dealerId: 55 },
+  { id: "20003001", name: "FINAL", city: "LEFKOSA", status: "Disabled", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-07 16:37:19", cashC: 78, cashA: 14820, cardC: 2, cardA: 2, totC: 17, totA: 14822, dealerId: 60 },
+  { id: "30001006", name: "CEMBER MARKET", city: "GIRNE", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 12:52:01", cashC: 47, cashA: 8740, cardC: 16, cardA: 44792.44, totC: 24, totA: 53532.44 },
+  { id: "30001009", name: "IKAS MARKET", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 13:53:58", cashC: 88, cashA: 15170, cardC: 14, cardA: 17010.08, totC: 35, totA: 32180.08, dealerId: 41 },
+  { id: "30002001", name: "GONYELI-ALAYKOY BLD", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-15 15:42:06", cashC: 6, cashA: 870, cardC: 0, cardA: 0, totC: 3, totA: 870, dealerId: 18 },
+  { id: "50001002", name: "ISATIS GROUP", city: "ISKELE", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-22 19:56:21", cashC: 95, cashA: 18240, cardC: 14, cardA: 35666.18, totC: 31, totA: 53906.18, dealerId: 63 },
+  { id: "70001001", name: "TPS-TERMINAL", city: "LEFKOSA", status: "OK", detail: "Paper near end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-24 14:14:24", cashC: 130, cashA: 22820, cardC: 12, cardA: 29990.21, totC: 28, totA: 52810.21 },
+  { id: "70002001", name: "SONMEZ", city: "MAGUSA", status: "OK", detail: "Paper near end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-24 12:02:40", cashC: 72, cashA: 12240, cardC: 3, cardA: 1888, totC: 17, totA: 14128 },
+  { id: "70002002", name: "SARPKAN", city: "MAGUSA", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 14:01:27", cashC: 54, cashA: 8870, cardC: 7, cardA: 6569.4, totC: 22, totA: 15439.4 },
+  { id: "70002003", name: "SARPKAN-DEREBOYU", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "Not used", last: "2026-04-24 12:32:27", cashC: 106, cashA: 18110, cardC: 17, cardA: 24405.67, totC: 34, totA: 42515.67 },
+  { id: "70002004", name: "SARPKAN2", city: "MAGUSA", status: "OK", detail: "Paper near end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-24 14:11:43", cashC: 108, cashA: 15970, cardC: 13, cardA: 21490.82, totC: 34, totA: 37460.82 },
+  { id: "70002005", name: "NEXSIS", city: "GIRNE", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 15:03:06", cashC: 64, cashA: 7490, cardC: 6, cardA: 5685.46, totC: 17, totA: 13175.46 },
+  { id: "70002006", name: "MG", city: "KARAOGLANOGLU", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 14:55:02", cashC: 34, cashA: 6050, cardC: 10, cardA: 13188.33, totC: 19, totA: 19238.33 },
+  { id: "70002007", name: "DINCALP TIM", city: "GIRNE", status: "OK", detail: "Paper jam", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-23 13:11:45", cashC: 57, cashA: 8650, cardC: 0, cardA: 0, totC: 10, totA: 8650 },
+  { id: "70002008", name: "TPS", city: "GIRNE", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 12:14:03", cashC: 59, cashA: 8730, cardC: 2, cardA: 1905.76, totC: 17, totA: 10635.76 },
+  { id: "70002009", name: "SARPKAN-SURICI", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 13:27:08", cashC: 25, cashA: 3170, cardC: 1, cardA: 740, totC: 13, totA: 3910 },
+  { id: "70002010", name: "CINAR", city: "GUZELYURT", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 13:21:20", cashC: 362, cashA: 62640, cardC: 24, cardA: 22510.46, totC: 84, totA: 85150.46 },
+  { id: "70002011", name: "METATECH", city: "ISKELE", status: "OK", detail: "Paper near end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-24 11:30:17", cashC: 11, cashA: 1950, cardC: 6, cardA: 1509.13, totC: 9, totA: 3459.13 },
+  { id: "70002014", name: "SONMEZ KALILAND", city: "MAGUSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 14:41:40", cashC: 208, cashA: 34420, cardC: 13, cardA: 14583.55, totC: 51, totA: 49003.55 },
+  { id: "70002015", name: "SERGIO", city: "GEMIKONAGI", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 13:58:25", cashC: 113, cashA: 17790, cardC: 17, cardA: 35634.71, totC: 44, totA: 53424.71 },
+  { id: "70002016", name: "SARPKAN-ISKELE", city: "ISKELE", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 14:53:37", cashC: 8, cashA: 1160, cardC: 1, cardA: 1074.19, totC: 5, totA: 2234.19 },
+  { id: "70002017", name: "NMS TIM", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 15:09:00", cashC: 90, cashA: 14340, cardC: 10, cardA: 14120.63, totC: 26, totA: 28460.63 },
+  { id: "70002018", name: "ELEKTRO", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 11:17:13", cashC: 35, cashA: 4530, cardC: 5, cardA: 4962.85, totC: 11, totA: 9492.85 },
+  { id: "70002019", name: "DINCALP-ERENKOY", city: "ERENKOY", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-23 12:08:44", cashC: 127, cashA: 23710, cardC: 7, cardA: 7934.61, totC: 28, totA: 31644.61 },
+  { id: "70002020", name: "MG", city: "GIRNE", status: "Not Found", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 14:37:07", cashC: 0, cashA: 0, cardC: 1738, cardA: 2627864.88, totC: 1738, totA: 2627864.88 },
+  { id: "70002021", name: "SARPKAN ISKELE2", city: "ISKELE", status: "Not Found", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 12:54:53", cashC: 0, cashA: 0, cardC: 148, cardA: 134284.28, totC: 148, totA: 134284.28 },
+  { id: "70003001", name: "LEFKOSA-MERKEZ", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-23 08:53:34", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0 },
+  { id: "70003002", name: "GIRNE-AMBAR 1", city: "GIRNE", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 11:50:31", cashC: 53, cashA: 10000, cardC: 2, cardA: 3468, totC: 10, totA: 13468 },
+  { id: "70003003", name: "LEFKOSA-AMBAR 1", city: "LEFKOSA", status: "OK", detail: "Paper jam", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-23 16:21:48", cashC: 2, cashA: 400, cardC: 3, cardA: 8269.86, totC: 4, totA: 8669.86 },
+  { id: "70003004", name: "MAGUSA-AMBAR", city: "MAGUSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-23 11:48:48", cashC: 22, cashA: 4300, cardC: 0, cardA: 0, totC: 1, totA: 4300 },
+  { id: "70003005", name: "GIRNE-AMBAR 2", city: "GIRNE", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-23 21:22:32", cashC: 39, cashA: 7600, cardC: 0, cardA: 0, totC: 3, totA: 7600 },
+  { id: "70003006", name: "GUZELYURT-AMBAR", city: "GUZELYURT", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-23 19:50:20", cashC: 17, cashA: 3400, cardC: 0, cardA: 0, totC: 1, totA: 3400 },
+  { id: "70003007", name: "MAGUSA-AMBAR 2", city: "MAGUSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 15:10:07", cashC: 32, cashA: 6400, cardC: 7, cardA: 20641.45, totC: 11, totA: 27041.45 },
+  { id: "70003008", name: "ISKELE-MERKEZ", city: "ISKELE", status: "OK", detail: "Door open", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-21 21:12:19", cashC: 23, cashA: 3820, cardC: 1, cardA: 2200, totC: 4, totA: 6020 },
+  { id: "70003009", name: "LEFKOSA-MerkezOut 1", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 12:15:46", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0 },
+  { id: "70003010", name: "LEFKOSA-MerkezOut 2", city: "LEFKOSA", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 10:08:47", cashC: 24, cashA: 3550, cardC: 6, cardA: 4040.73, totC: 8, totA: 7590.73 },
+  { id: "70003011", name: "LEFKE-MERKEZ", city: "LEFKE", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 15:02:38", cashC: 44, cashA: 8260, cardC: 2, cardA: 2225.43, totC: 7, totA: 10485.43 },
+  { id: "70003012", name: "GIRNE-AMBAR 3", city: "GIRNE", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 13:32:40", cashC: 76, cashA: 15000, cardC: 13, cardA: 45105.83, totC: 19, totA: 60105.83 },
+  { id: "70003013", name: "GIRNE-MERKEZ OUT", city: "GIRNE", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-23 15:18:34", cashC: 21, cashA: 4000, cardC: 0, cardA: 0, totC: 3, totA: 4000 },
+  { id: "70003014", name: "YENI ERENKOY", city: "ERENKOY", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-21 11:28:32", cashC: 22, cashA: 3580, cardC: 2, cardA: 2884, totC: 5, totA: 6464 },
+  { id: "70003015", name: "MEHMETCIK", city: "MEHMETCIK", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 13:19:02", cashC: 98, cashA: 14900, cardC: 4, cardA: 18165, totC: 9, totA: 33065 },
+  { id: "70003016", name: "GUZELYURT M. OUT", city: "GUZELYURT", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 01:52:36", cashC: 5, cashA: 1000, cardC: 0, cardA: 0, totC: 1, totA: 1000 },
+  { id: "70003017", name: "ISKELE-MERKEZ 2", city: "ISKELE", status: "OK", detail: "Paper near end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 12:53:57", cashC: 147, cashA: 27620, cardC: 12, cardA: 55090, totC: 23, totA: 82710 },
+  { id: "70003018", name: "MAGUSA-MerkezOut", city: "MAGUSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 12:13:26", cashC: 8, cashA: 1600, cardC: 1, cardA: 1500, totC: 2, totA: 3100 },
+  { id: "70003019", name: "LEFKOSA-AMBAR 2", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 15:05:45", cashC: 0, cashA: 0, cardC: 3, cardA: 6400, totC: 3, totA: 6400 },
+  { id: "70003020", name: "LEFKOSA-AMBAR 3", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 09:14:06", cashC: 5, cashA: 850, cardC: 0, cardA: 0, totC: 1, totA: 850 },
+  { id: "70004000", name: "SAKARYA SHOP KAYA", city: "MAGUSA", status: "Error", detail: "Banknote jam", monitors: 1, paper: "OK", bill: "Error", last: "2026-04-24 15:00:36", cashC: 0, cashA: 0, cardC: 815, cardA: 1478881.78, totC: 815, totA: 1478881.78 },
+  { id: "70004001", name: "VODAFONE-ORTAKOY", city: "LEFKOSA", status: "Error", detail: "Printer offline", monitors: 2, paper: "Paper absent", bill: "Error", last: "2026-04-24 15:09:43", cashC: 0, cashA: 0, cardC: 12264, cardA: 20899518.99, totC: 12264, totA: 20899518.99, dealerId: 16 },
+  { id: "70004002", name: "GIRNE CARSI", city: "GIRNE", status: "OK", detail: "Paper jam", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 15:08:19", cashC: 0, cashA: 0, cardC: 2907, cardA: 4506912, totC: 2907, totA: 4506912 },
+  { id: "70004003", name: "GIRNE MERKEZ-TUNES", city: "GIRNE", status: "Error", detail: "Com-port error", monitors: 2, paper: "OK", bill: "Error", last: "2026-04-24 15:09:02", cashC: 0, cashA: 0, cardC: 605, cardA: 1249296.92, totC: 605, totA: 1249296.92 },
+  { id: "70004018", name: "ORTAKOY MERKEZ 2", city: "LEFKOSA", status: "Not Found", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 13:39:18", cashC: 0, cashA: 0, cardC: 552, cardA: 949406.84, totC: 552, totA: 949406.84 },
+  { id: "70006001", name: "DEGIRMENLIK BLD - YIGITLER", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-23 07:38:45", cashC: 29, cashA: 5800, cardC: 1, cardA: 6600, totC: 15, totA: 12400, dealerId: 20 },
+  { id: "70006002", name: "DEGIRMENLIK BLD - DILEKKAYA", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 07:26:15", cashC: 15, cashA: 2900, cardC: 0, cardA: 0, totC: 2, totA: 2900, dealerId: 20 },
+  { id: "70006003", name: "DEGIRMENLIK BLD - GAZIKOY", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 10:59:11", cashC: 2, cashA: 300, cardC: 0, cardA: 0, totC: 2, totA: 300, dealerId: 20 },
+  { id: "70006004", name: "DEGIRMENLIK BLD - CIHANGIR", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 04:13:31", cashC: 40, cashA: 7060, cardC: 0, cardA: 0, totC: 8, totA: 7060, dealerId: 20 },
+  { id: "70006005", name: "DEGIRMENLIK BLD - DUZOVA", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-23 15:29:56", cashC: 10, cashA: 2000, cardC: 0, cardA: 0, totC: 1, totA: 2000, dealerId: 20 },
+  { id: "70006006", name: "DEGIRMENLIK BLD - SAM", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "OK", last: "2026-04-24 11:31:45", cashC: 84, cashA: 16050, cardC: 29, cardA: 37047.59, totC: 65, totA: 53097.59, dealerId: 20 },
+  { id: "70006007", name: "DEGIRMENLIK BLD - ERCAN", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 12:58:24", cashC: 21, cashA: 3400, cardC: 9, cardA: 31722.61, totC: 11, totA: 35122.61, dealerId: 20 },
+  { id: "70006008", name: "DEGIRMENLIK BLD - YENICEKOY", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-19 19:00:57", cashC: 51, cashA: 7360, cardC: 0, cardA: 0, totC: 14, totA: 7360, dealerId: 20 },
+  { id: "70006009", name: "DEGIRMENLIK BLD - BASPINAR", city: "LEFKOSA", status: "OK", detail: "Door open", monitors: 1, paper: "OK", bill: "Error", last: "2026-04-21 18:45:09", cashC: 2, cashA: 400, cardC: 3, cardA: 14367.9, totC: 5, totA: 14767.9, dealerId: 20 },
+  { id: "70006010", name: "DEGIRMENLIK BLD - BALIKESIR", city: "LEFKOSA", status: "OK", detail: "Notch error", monitors: 1, paper: "OK", bill: "OK", last: "2026-04-24 14:43:22", cashC: 11, cashA: 2200, cardC: 3, cardA: 7152.8, totC: 6, totA: 9352.8, dealerId: 20 },
+  { id: "70006011", name: "DEGIRMENLIK BLD - ERULKU", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 14:34:25", cashC: 42, cashA: 8100, cardC: 3, cardA: 2087.12, totC: 9, totA: 10187.12, dealerId: 20 },
+  { id: "70006014", name: "DEGIRMENLIK BLD - KALAVAC", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-23 19:07:45", cashC: 99, cashA: 17970, cardC: 20, cardA: 19401.43, totC: 72, totA: 37371.43, dealerId: 20 },
+  { id: "70006015", name: "DEGIRMENLIK BLD - ERDEMLI", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-21 16:09:44", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 20 },
+  { id: "70006016", name: "DEGIRMENLIK BLD - KIRIKKALE", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "Not used", last: "2026-04-23 08:38:05", cashC: 65, cashA: 12190, cardC: 6, cardA: 19829.22, totC: 24, totA: 32019.22, dealerId: 20 },
+  { id: "70006017", name: "DEGIRMENLIK BLD - MERIC", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 10:36:17", cashC: 40, cashA: 7700, cardC: 4, cardA: 2000, totC: 12, totA: 9700, dealerId: 20 },
+  { id: "70007001", name: "MEHMETCIK MERKEZ", city: "MEHMETCIK", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-23 18:38:45", cashC: 139, cashA: 26250, cardC: 51, cardA: 34544.34, totC: 102, totA: 60794.34, dealerId: 21 },
+  { id: "70007002", name: "BUYUKKONUK", city: "MEHMETCIK", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-15 16:57:49", cashC: 56, cashA: 8910, cardC: 5, cardA: 3470.49, totC: 24, totA: 12380.49, dealerId: 21 },
+  { id: "90004003", name: "CAESAR MERKEZ 2", city: "ISKELE", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 14:31:33", cashC: 56, cashA: 9860, cardC: 15, cardA: 26354.29, totC: 28, totA: 36214.29, dealerId: 40 },
+  { id: "90004004", name: "CAESAR BLUE", city: "ISKELE", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-24 14:59:25", cashC: 10, cashA: 1800, cardC: 8, cardA: 6080, totC: 13, totA: 7880, dealerId: 40 },
+  { id: "90005001", name: "YDU HASTAHANE", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-23 14:01:58", cashC: 0, cashA: 0, cardC: 291, cardA: 604266.73, totC: 291, totA: 604266.73, dealerId: 41 },
+  { id: "90005002", name: "YDU KUTUPHANE", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-16 12:01:15", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 41 },
+  { id: "90005003", name: "YDU EGITIM SARAYI", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-03-23 14:06:17", cashC: 27, cashA: 3450, cardC: 0, cardA: 0, totC: 5, totA: 3450, dealerId: 41 },
+  { id: "90005004", name: "YDU HASTANE", city: "MAGUSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-20 08:48:36", cashC: 21, cashA: 3100, cardC: 7, cardA: 12941.18, totC: 13, totA: 16041.18, dealerId: 41 },
+  { id: "90006001", name: "LEFKE BLD - MERKEZ", city: "LEFKE", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-22 17:22:20", cashC: 37, cashA: 4910, cardC: 2, cardA: 4049.47, totC: 12, totA: 8929.9, dealerId: 42 },
+  { id: "90006002", name: "LEFKE BLD - GEMIKONAGI", city: "LEFKE", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 13:11:07", cashC: 86, cashA: 13080, cardC: 9, cardA: 6400, totC: 30, totA: 19274, dealerId: 42 },
+  { id: "90007001", name: "GIGEM OTOPARK", city: "GIRNE", status: "OK", detail: "Notch error", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-23 22:30:44", cashC: 88, cashA: 16790, cardC: 2, cardA: 1545.64, totC: 16, totA: 18335.64, dealerId: 43 },
+  { id: "90008001", name: "LTB - MERKEZ", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 10:52:00", cashC: 167, cashA: 30760, cardC: 1, cardA: 1000, totC: 16, totA: 55292.55, dealerId: 45 },
+  { id: "90008002", name: "LTB - SURICI-OTOPARK", city: "LEFKOSA", status: "Error", monitors: 1, paper: "OK", bill: "Error", last: "2025-10-08 08:43:39", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 45 },
+  { id: "90008003", name: "LTB - METEHAN", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "OK", last: "2026-04-24 12:25:53", cashC: 140, cashA: 23990, cardC: 9, cardA: 8009.88, totC: 25, totA: 31999.88, dealerId: 45 },
+  { id: "90008004", name: "LTB - FIDANLIK", city: "LEFKOSA", status: "OK", monitors: 2, paper: "OK", bill: "Not used", last: "2026-04-24 14:56:25", cashC: 46, cashA: 7930, cardC: 1, cardA: 3600, totC: 6, totA: 8930, dealerId: 45 },
+  { id: "90008005", name: "LTB - MEZARLIK", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "OK", last: "2026-01-25 12:34:03", cashC: 60, cashA: 11640, cardC: 0, cardA: 0, totC: 5, totA: 11640, dealerId: 45 },
+  { id: "90008006", name: "LTB - HAMITKOY", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 11:48:11", cashC: 18, cashA: 3140, cardC: 1, cardA: 1538.89, totC: 7, totA: 6760.6, dealerId: 45 },
+  { id: "90008007", name: "LTB - HASPOLAT", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "OK", last: "2026-04-24 13:20:52", cashC: 65, cashA: 10440, cardC: 14, cardA: 25725.25, totC: 26, totA: 36165.25, dealerId: 45 },
+  { id: "90008008", name: "LTB - LEFKOSA", city: "LEFKOSA", status: "Error", monitors: 1, paper: "Paper absent", bill: "Error", last: "2026-04-06 13:40:41", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 45 },
+  { id: "90009101", name: "(Adakart) ITIMAT MAGUSA", city: "MAGUSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-23 15:10:14", cashC: 58, cashA: 10380, cardC: 8, cardA: 33348.09, totC: 25, totA: 43728.09, dealerId: 77 },
+  { id: "90009102", name: "(Adakart) GOCMEN MAGUSA", city: "MAGUSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-20 14:10:19", cashC: 90, cashA: 15370, cardC: 9, cardA: 19296.52, totC: 37, totA: 34666.52, dealerId: 77 },
+  { id: "90009103", name: "(Adakart) UKU FINA 2", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2025-12-28 19:43:59", cashC: 44, cashA: 6290, cardC: 3, cardA: 500, totC: 42, totA: 7190, dealerId: 77 },
+  { id: "90009105", name: "(Adakart) GUZELYURT TERMINAL", city: "GUZELYURT", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 07:14:49", cashC: 1, cashA: 100, cardC: 3, cardA: 215, totC: 5, totA: 415, dealerId: 77 },
+  { id: "90009106", name: "(Adakart) UKU FINA", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 11:45:21", cashC: 118, cashA: 13750, cardC: 2, cardA: 1464.36, totC: 48, totA: 15214.36, dealerId: 77 },
+  { id: "90009107", name: "(Adakart) NALBANTOGLU", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 2, paper: "Near end", bill: "Not used", last: "2026-04-20 12:34:39", cashC: 20, cashA: 1430, cardC: 0, cardA: 0, totC: 6, totA: 1430, dealerId: 77 },
+  { id: "90009108", name: "(Adakart) TERMINAL LEFKOSA", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 14:01:19", cashC: 57, cashA: 9460, cardC: 3, cardA: 910, totC: 31, totA: 10170, dealerId: 77 },
+  { id: "90009109", name: "(Adakart) GIRNE KAPI DURAKLAR", city: "LEFKOSA", status: "OK", detail: "Notch error", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 12:37:02", cashC: 15, cashA: 2820, cardC: 1, cardA: 100, totC: 10, totA: 3120, dealerId: 77 },
+  { id: "90009110", name: "(Adakart) UKU FINA 3", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-24 12:39:11", cashC: 20, cashA: 2330, cardC: 1, cardA: 480, totC: 19, totA: 3810, dealerId: 77 },
+  { id: "90009111", name: "(Adakart) TERMINAL LEFKOSA 2", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-21 10:45:38", cashC: 105, cashA: 12290, cardC: 2, cardA: 1000, totC: 55, totA: 13390, dealerId: 77 },
+  { id: "90009112", name: "(Adakart) ALBAYRAK KAHVE", city: "GIRNE", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-20 13:22:52", cashC: 0, cashA: 0, cardC: 0, cardA: 0, totC: 0, totA: 0, dealerId: 77 },
+  { id: "90009113", name: "(Adakart) CADDE MUTFAK", city: "LEFKOSA", status: "OK", monitors: 1, paper: "OK", bill: "Not used", last: "2026-04-23 23:09:05", cashC: 3, cashA: 320, cardC: 4, cardA: 929.85, totC: 7, totA: 1249.85, dealerId: 77 },
+  { id: "90009114", name: "(Adakart) GONYELI SPOR KULUBU", city: "LEFKOSA", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 14:40:21", cashC: 53, cashA: 7910, cardC: 2, cardA: 5000, totC: 12, totA: 12910, dealerId: 77 },
+  { id: "90009115", name: "(Adakart) ISKELE GECE OFIS", city: "ISKELE", status: "OK", detail: "Near paper end", monitors: 1, paper: "Near end", bill: "Not used", last: "2026-04-24 13:23:56", cashC: 5, cashA: 540, cardC: 2, cardA: 2300, totC: 5, totA: 2840, dealerId: 77 },
+];
+
+export const kiosks: Kiosk[] = raw.map((r) => ({
+  id: r.id,
+  name: r.name,
+  city: r.city,
+  status: r.status,
+  statusDetail: r.detail ?? "Operational",
+  monitors: r.monitors,
+  paperStatus: r.paper,
+  bankNoteStatus: r.bill,
+  lastActivity: r.last,
+  cashCount: r.cashC,
+  cashAmount: r.cashA,
+  cardCount: r.cardC,
+  cardAmount: r.cardA,
+  totalCount: r.totC,
+  totalAmount: r.totA,
+  dealerId: r.dealerId,
+}));
+
+export function getKiosk(id: string) {
+  return kiosks.find((k) => k.id === id);
+}
