@@ -16,9 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import {
-  AlertTriangle,
   Banknote,
-  CircleX,
   CreditCard,
   MonitorSmartphone,
   PowerOff,
@@ -46,6 +44,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type PresetId } from "@/components/dashboard/date-range-picker";
 import {
@@ -53,12 +52,12 @@ import {
   TOTAL_CARD,
   TOTAL_CASH,
   TOTAL_TURNOVER,
+  kioskStatusSegment,
   kioskStatusBreakdown,
   topByCity,
   topKiosks,
 } from "@/lib/aggregations";
 import { kiosks } from "@/lib/data/kiosks";
-import { dealers } from "@/lib/data/dealers";
 import type { Kiosk } from "@/lib/data/types";
 import { useI18n } from "@/lib/i18n";
 import { translateKioskStatus } from "@/lib/i18n/kiosk-status";
@@ -77,16 +76,11 @@ export default function MpsDashboardPage() {
   const [by, setBy] = React.useState<"totalAmount" | "totalCount">("totalAmount");
   const [, setNonce] = React.useState(0);
   const [selected, setSelected] = React.useState<Kiosk | null>(null);
+  const [statusDrilldown, setStatusDrilldown] = React.useState<string | null>(null);
 
   const statusBreak = kioskStatusBreakdown();
   const top = topKiosks(20, by);
   const cities = topByCity(kiosks, by).slice(0, 8);
-
-  const paperWarn = kiosks.filter(
-    (k) => k.paperStatus === "Near end" || k.paperStatus === "Paper absent"
-  ).length;
-  const errorCount = kiosks.filter((k) => k.status === "Error").length;
-  const disabledCount = kiosks.filter((k) => k.status === "Disabled").length;
 
   const columns: Column<Kiosk>[] = React.useMemo(
     () => [
@@ -146,6 +140,36 @@ export default function MpsDashboardPage() {
     [t]
   );
 
+  const statusDrillColumns: Column<Kiosk>[] = React.useMemo(
+    () => [
+      { key: "id", header: t("dashboard.mps.colKioskId"), sortable: true, width: "110px" },
+      { key: "name", header: t("dashboard.mps.colLocation"), sortable: true },
+      {
+        key: "status",
+        header: t("dashboard.mps.colStatus"),
+        sortable: true,
+        accessor: (r) => kioskStatusSegment(r),
+        format: (r) => {
+          const seg = kioskStatusSegment(r);
+          return (
+            <StatusBadge tone={kioskStatusTone(seg)}>
+              {translateKioskStatus(seg, t)}
+            </StatusBadge>
+          );
+        },
+      },
+    ],
+    [t]
+  );
+
+  const statusDrillRows = React.useMemo(
+    () =>
+      statusDrilldown
+        ? kiosks.filter((k) => kioskStatusSegment(k) === statusDrilldown)
+        : [],
+    [statusDrilldown]
+  );
+
   return (
     <div className="space-y-6">
       <DashboardHeader
@@ -164,7 +188,7 @@ export default function MpsDashboardPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label={t("dashboard.mps.kpiDms")}
           value={TOTAL_TURNOVER}
@@ -196,20 +220,6 @@ export default function MpsDashboardPage() {
           icon={MonitorSmartphone}
           sub={t("dashboard.mps.kpiTotalKiosksSub", { n: KPI.activeKiosks })}
           tone="brand"
-        />
-        <KpiCard
-          label={t("dashboard.mps.kpiPaper")}
-          value={paperWarn}
-          icon={AlertTriangle}
-          sub={t("dashboard.mps.kpiErrDisabledSub", { errors: errorCount, disabled: disabledCount })}
-          tone="warning"
-        />
-        <KpiCard
-          label={t("dashboard.mps.kpiInactive")}
-          value={errorCount + disabledCount}
-          icon={CircleX}
-          sub={t("dashboard.mps.subAttention")}
-          tone="danger"
         />
       </div>
 
@@ -287,7 +297,10 @@ export default function MpsDashboardPage() {
                 radius={[0, 6, 6, 0]}
                 onClick={(entry) => {
                   const k = (entry as { full?: Kiosk }).full;
-                  if (k) setSelected(k);
+                  if (k) {
+                    setStatusDrilldown(null);
+                    setSelected(k);
+                  }
                 }}
                 style={{ cursor: "pointer" }}
               />
@@ -310,11 +323,17 @@ export default function MpsDashboardPage() {
                 paddingAngle={1.5}
                 dataKey="value"
                 nameKey="name"
+                style={{ outline: "none" }}
+                className="cursor-pointer [&_*]:cursor-pointer"
               >
                 {statusBreak.map((entry) => (
                   <Cell
                     key={entry.name}
                     fill={STATUS_COLORS[entry.name] ?? "#94A3B8"}
+                    stroke="transparent"
+                    className="cursor-pointer outline-none"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setStatusDrilldown(entry.name)}
                   />
                 ))}
               </Pie>
@@ -331,19 +350,21 @@ export default function MpsDashboardPage() {
           </div>
           <div className="mt-2 grid min-h-0 flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto text-xs">
             {statusBreak.map((s) => (
-              <div
+              <button
                 key={s.name}
-                className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5"
+                type="button"
+                onClick={() => setStatusDrilldown(s.name)}
+                className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-left transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 shrink-0 rounded-full"
                   style={{ backgroundColor: STATUS_COLORS[s.name] }}
                 />
-                <span className="flex-1 truncate text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
                   {translateKioskStatus(s.name, t)}
                 </span>
-                <span className="font-semibold tabular-nums">{s.value}</span>
-              </div>
+                <span className="shrink-0 font-semibold tabular-nums">{s.value}</span>
+              </button>
             ))}
           </div>
         </ChartCard>
@@ -516,7 +537,10 @@ export default function MpsDashboardPage() {
             rows={kiosks}
             columns={columns}
             rowKey={(k) => k.id}
-            onRowClick={setSelected}
+            onRowClick={(k) => {
+              setStatusDrilldown(null);
+              setSelected(k);
+            }}
             searchKeys={["id", "name", "city"]}
             searchPlaceholder={t("dashboard.mps.searchKiosks")}
             pageSize={10}
@@ -528,11 +552,12 @@ export default function MpsDashboardPage() {
                 label: t("common.status"),
                 options: [
                   { value: "OK", label: translateKioskStatus("OK", t) },
+                  { value: "Paper Warning", label: translateKioskStatus("Paper Warning", t) },
                   { value: "Error", label: translateKioskStatus("Error", t) },
                   { value: "Disabled", label: translateKioskStatus("Disabled", t) },
                   { value: "Not Found", label: translateKioskStatus("Not Found", t) },
                 ],
-                predicate: (k, v) => k.status === v,
+                predicate: (k, v) => kioskStatusSegment(k) === v,
               },
               {
                 id: "city",
@@ -547,6 +572,42 @@ export default function MpsDashboardPage() {
         </CardContent>
       </Card>
 
+      <Sheet
+        open={Boolean(statusDrilldown)}
+        onOpenChange={(o) => !o && setStatusDrilldown(null)}
+      >
+        <SheetContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-2xl">
+          <SheetHeader className="shrink-0 space-y-1 pr-8 text-left">
+            <SheetTitle>
+              {statusDrilldown ? translateKioskStatus(statusDrilldown, t) : ""}
+            </SheetTitle>
+            <SheetDescription>
+              {statusDrilldown
+                ? t("dashboard.mps.statusDrillDesc", {
+                    n: statusDrillRows.length,
+                  })
+                : ""}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-auto pt-2">
+            <DataTable<Kiosk>
+              rows={statusDrillRows}
+              columns={statusDrillColumns}
+              rowKey={(k) => k.id}
+              searchKeys={["id", "name"]}
+              searchPlaceholder={t("dashboard.mps.searchKiosks")}
+              pageSize={10}
+              initialSort={{ key: "name", dir: "asc" }}
+              exportName={
+                statusDrilldown
+                  ? `kiosks-${statusDrilldown.replace(/\s+/g, "-").toLowerCase()}.csv`
+                  : "kiosks.csv"
+              }
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <KioskDetailSheet
         open={Boolean(selected)}
         onOpenChange={(o) => !o && setSelected(null)}
@@ -554,6 +615,85 @@ export default function MpsDashboardPage() {
       />
     </div>
   );
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function toInputDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseInputDate(s: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (
+    dt.getFullYear() !== y ||
+    dt.getMonth() !== m - 1 ||
+    dt.getDate() !== d
+  ) {
+    return null;
+  }
+  return dt;
+}
+
+function daysInclusive(a: Date, b: Date): number {
+  const start = startOfDay(a);
+  const end = startOfDay(b);
+  if (end < start) return 0;
+  return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+const SHEET_CHART_MAX_DAYS = 90;
+
+/** Inclusive range; splits kiosk cash/card totals across days (illustrative). */
+function kioskDailyCashCardSeries(
+  kiosk: Kiosk,
+  rangeStart: Date,
+  rangeEnd: Date
+): { day: string; cash: number; card: number }[] {
+  const start = startOfDay(rangeStart);
+  const end = startOfDay(rangeEnd);
+  if (end < start) return [];
+  let days = daysInclusive(start, end);
+  if (days < 1) return [];
+  if (days > SHEET_CHART_MAX_DAYS) {
+    days = SHEET_CHART_MAX_DAYS;
+  }
+  const weights: number[] = [];
+  for (let i = 0; i < days; i++) {
+    let h = 0;
+    const seed = `${kiosk.id}-${i}-${start.getTime()}`;
+    for (let j = 0; j < seed.length; j++) {
+      h = (h * 31 + seed.charCodeAt(j)) | 0;
+    }
+    weights.push(0.35 + Math.abs(Math.sin(h * 0.001)) * 0.9);
+  }
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  const rows = weights.map((w, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const wd = d.toLocaleDateString("en-US", { weekday: "short" });
+    const dayNum = d.getDate();
+    const mon = d.getMonth() + 1;
+    return {
+      day: `${wd} ${dayNum}/${mon}`,
+      cash: Math.round((kiosk.cashAmount * w) / sum),
+      card: Math.round((kiosk.cardAmount * w) / sum),
+    };
+  });
+  const cashSum = rows.reduce((a, r) => a + r.cash, 0);
+  const cardSum = rows.reduce((a, r) => a + r.card, 0);
+  if (rows.length) {
+    rows[rows.length - 1].cash += kiosk.cashAmount - cashSum;
+    rows[rows.length - 1].card += kiosk.cardAmount - cardSum;
+  }
+  return rows;
 }
 
 function KioskDetailSheet({
@@ -566,14 +706,49 @@ function KioskDetailSheet({
   kiosk: Kiosk | null;
 }) {
   const { t } = useI18n();
+  const [fromInput, setFromInput] = React.useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 6);
+    return toInputDate(start);
+  });
+  const [toInput, setToInput] = React.useState(() => toInputDate(new Date()));
+
+  React.useEffect(() => {
+    if (!open || !kiosk) return;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 6);
+    setToInput(toInputDate(end));
+    setFromInput(toInputDate(start));
+  }, [open, kiosk?.id]);
+
+  const rangeStart = parseInputDate(fromInput);
+  const rangeEnd = parseInputDate(toInput);
+  const rangeOk = Boolean(rangeStart && rangeEnd && rangeStart <= rangeEnd);
+  const spanDays =
+    rangeOk && rangeStart && rangeEnd
+      ? daysInclusive(rangeStart, rangeEnd)
+      : 0;
+  const rangeCapped = rangeOk && spanDays > SHEET_CHART_MAX_DAYS;
+  const dailySeries =
+    rangeOk && kiosk ? kioskDailyCashCardSeries(kiosk, rangeStart!, rangeEnd!) : [];
+
+  function applyPresetDayCount(n: number) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - (n - 1));
+    setToInput(toInputDate(end));
+    setFromInput(toInputDate(start));
+  }
+
   if (!kiosk) return null;
-  const dealer = dealers.find((d) => d.id === kiosk.dealerId);
   const cashPct =
     kiosk.totalAmount > 0 ? (kiosk.cashAmount / kiosk.totalAmount) * 100 : 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-xl">
+      <SheetContent className="sm:max-w-2xl">
         <SheetHeader>
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/15 text-primary">
@@ -633,29 +808,6 @@ function KioskDetailSheet({
             />
           </div>
 
-          <div className="rounded-lg border border-border p-3">
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{t("common.cashCardMix")}</span>
-              <span className="tabular-nums font-semibold">
-                {t("common.pctCash", { n: cashPct.toFixed(1) })}
-              </span>
-            </div>
-            <div className="flex h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full bg-warning"
-                style={{ width: `${cashPct}%` }}
-              />
-              <div
-                className="h-full flex-1 bg-info"
-                style={{ width: `${100 - cashPct}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>{t("common.cashLabel")}</span>
-              <span>{t("common.cardLabel")}</span>
-            </div>
-          </div>
-
           <div className="grid grid-cols-3 gap-2 text-xs">
             <Flag label={t("dashboard.mps.labelMonitors")} value={String(kiosk.monitors)} />
             <Flag
@@ -676,22 +828,150 @@ function KioskDetailSheet({
             />
           </div>
 
-          <div className="rounded-lg border border-border p-3 text-sm">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("common.dealer")}
+          <div className="rounded-lg border border-border p-3">
+            <div className="mb-2 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{t("common.cashCardMix")}</span>
+              <span className="tabular-nums font-semibold">
+                {t("common.pctCash", { n: cashPct.toFixed(1) })}
+              </span>
             </div>
-            {dealer ? (
-              <>
-                <div className="mt-1 font-medium">{dealer.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {dealer.location} · {dealer.email}
+            <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full bg-warning" style={{ width: `${cashPct}%` }} />
+              <div
+                className="h-full bg-info"
+                style={{ width: `${Math.max(0, 100 - cashPct)}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{t("common.cashLabel")}</span>
+              <span>{t("common.cardLabel")}</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("dashboard.mps.sheetDailyCashCardTitle")}
                 </div>
-              </>
-            ) : (
-              <div className="mt-1 text-xs text-muted-foreground">
-                {t("common.unassignedDealer")}
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {t("dashboard.mps.sheetDailyCashCardDesc")}
+                </p>
               </div>
-            )}
+              <div className="flex shrink-0 flex-wrap gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => applyPresetDayCount(7)}
+                >
+                  {t("dashboard.mps.sheetRangePreset7")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => applyPresetDayCount(30)}
+                >
+                  {t("dashboard.mps.sheetRangePreset30")}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label
+                  htmlFor="kiosk-chart-from"
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  {t("dashboard.mps.sheetRangeFrom")}
+                </label>
+                <Input
+                  id="kiosk-chart-from"
+                  type="date"
+                  value={fromInput}
+                  onChange={(e) => setFromInput(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="kiosk-chart-to"
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  {t("dashboard.mps.sheetRangeTo")}
+                </label>
+                <Input
+                  id="kiosk-chart-to"
+                  type="date"
+                  value={toInput}
+                  onChange={(e) => setToInput(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+            {!rangeOk ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {t("dashboard.mps.sheetRangeInvalid")}
+              </p>
+            ) : null}
+            {rangeCapped ? (
+              <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-500">
+                {t("dashboard.mps.sheetRangeCapped", { n: SHEET_CHART_MAX_DAYS })}
+              </p>
+            ) : null}
+            <div className="mt-3 h-[200px] w-full min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={dailySeries}
+                  margin={{ left: -18, right: 4, top: 8, bottom: 4 }}
+                  barCategoryGap="14%"
+                  barGap={4}
+                >
+                  <CartesianGrid
+                    strokeDasharray="4 4"
+                    vertical={false}
+                    stroke="hsl(var(--border))"
+                  />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={dailySeries.length > 18 ? Math.floor(dailySeries.length / 10) : 0}
+                    angle={-22}
+                    textAnchor="end"
+                    height={dailySeries.length > 18 ? 52 : 44}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={compactCurrencyFormatter}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                  />
+                  <Tooltip
+                    content={<ChartTooltip valueFormatter={compactCurrencyFormatter} />}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                  <Bar
+                    dataKey="cash"
+                    name={t("common.cash")}
+                    fill="#EAB308"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={32}
+                  />
+                  <Bar
+                    dataKey="card"
+                    name={t("common.card")}
+                    fill="#3B82F6"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={32}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </SheetContent>

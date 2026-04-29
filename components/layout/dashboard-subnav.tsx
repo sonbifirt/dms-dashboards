@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
-  Building2,
   MonitorSmartphone,
   ShoppingBag,
 } from "lucide-react";
@@ -22,7 +21,6 @@ const tabs = [
     end: false,
   },
   { href: "/dashboard/psp", labelKey: "subnav.psp" as const, icon: ShoppingBag, end: false },
-  { href: "/dashboard/dealers", labelKey: "subnav.dealers" as const, icon: Building2, end: false },
 ];
 
 function isTabActive(pathname: string, href: string, end: boolean) {

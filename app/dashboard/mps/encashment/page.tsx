@@ -20,12 +20,13 @@ import { EncashmentReportTable } from "@/components/dashboard/encashment-report-
 import { generateEncashmentReport, reportKey as makeReportKey } from "@/lib/data/encashment";
 import { dealers } from "@/lib/data/dealers";
 import {
-  attachRouting,
-  BANK_SAFE_CUTOFF,
-  computeDailyCashPosition,
+  computeDailyCashPositionLedger,
   sumMpsTotal,
 } from "@/lib/encashment-cash-position";
-import { useEncashmentDemoStore } from "@/lib/encashment-demo-store";
+import {
+  sumManualAdjustmentsForRow,
+  useEncashmentDemoStore,
+} from "@/lib/encashment-demo-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,17 +51,7 @@ function parseLocalInputValue(s: string): Date {
   return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
-type WorkflowFilter = "all" | "approved" | "in_safe" | "deposited";
-
-function mapDepositReason(
-  reason: string,
-  t: (k: MessageKey) => string
-): string {
-  if (reason === "No rows") return t("encashment.reasonNoRows");
-  if (reason === "No approved pre-cutoff rows")
-    return t("encashment.reasonNoApproved");
-  return reason;
-}
+type WorkflowFilter = "all" | "pending_review" | "approved";
 
 export default function EncashmentControlPage() {
   const { t, dateLocale } = useI18n();
@@ -106,92 +97,108 @@ export default function EncashmentControlPage() {
 
   const {
     hydrated,
-    carryForwardOpening,
-    setCarryForwardOpening,
+    openingSafeBalance,
+    ledger,
     withWorkflow,
-    bankInfo,
     toggleReview,
     setExceptionFlag,
     approveRow,
-    confirmBulkBankDeposit,
+    addManualAdjustment,
+    removeManualAdjustment,
+    recordBankDepositFromEncashmentRow,
+    confirmBankDeposit,
+    routeRowToOfficeSafe,
+    relaySafeAddToBank,
     resetReportDemo,
-  } = useEncashmentDemoStore(rk, baseRows, BANK_SAFE_CUTOFF);
+  } = useEncashmentDemoStore(rk, baseRows);
 
   const filtered = React.useMemo(() => {
+    let list = withWorkflow;
     if (userLogin.trim()) {
       const q = userLogin.trim().toLowerCase();
-      return withWorkflow.filter((x) => x.row.kioskId.toLowerCase().includes(q));
+      list = list.filter((x) => x.row.kioskId.toLowerCase().includes(q));
     }
-    if (wfFilter === "all") return withWorkflow;
-    return withWorkflow.filter(({ row: r, workflow: w }) => {
-      if (wfFilter === "deposited") return w.deposited;
-      if (wfFilter === "approved")
-        return w.approved && !w.deposited;
-      if (wfFilter === "in_safe") {
-        return (
-          w.routing === "post_cutoff_safe" &&
-          w.approved &&
-          !w.deposited
-        );
-      }
-      return true;
-    });
+    if (wfFilter === "pending_review") {
+      return list.filter((x) => !x.workflow.reviewed);
+    }
+    if (wfFilter === "approved") {
+      return list.filter((x) => x.workflow.approved);
+    }
+    return list;
   }, [withWorkflow, wfFilter, userLogin]);
 
-  const preTableRows = React.useMemo(
-    () => filtered.filter((x) => x.workflow.routing === "pre_cutoff_bank"),
-    [filtered]
-  );
-  const postTableRows = React.useMemo(
-    () => filtered.filter((x) => x.workflow.routing === "post_cutoff_safe"),
-    [filtered]
+  const pendingReview = withWorkflow.filter((x) => !x.workflow.reviewed).length;
+  const approvedCount = withWorkflow.filter((x) => x.workflow.approved).length;
+
+  const manualAdjTotal = React.useMemo(() => {
+    return withWorkflow.reduce(
+      (a, x) => a + sumManualAdjustmentsForRow(x.workflow),
+      0
+    );
+  }, [withWorkflow]);
+
+  const officeSafeBookedRowIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of ledger.safeAdds) {
+      if (s.sourceEncashmentRowId) ids.add(s.sourceEncashmentRowId);
+    }
+    return ids;
+  }, [ledger.safeAdds]);
+
+  const bankDepositsConfirmedTotal = React.useMemo(
+    () =>
+      ledger.bankDeposits
+        .filter((x) => x.depositConfirmed !== false)
+        .reduce((a, x) => a + x.amount, 0),
+    [ledger.bankDeposits]
   );
 
-  const pendingReview = withWorkflow.filter((x) => !x.workflow.reviewed).length;
-  const approvedCount = withWorkflow.filter(
-    (x) => x.workflow.approved
-  ).length;
-  const inSafeCount = withWorkflow.filter(
-    (x) =>
-      x.workflow.routing === "post_cutoff_safe" &&
-      x.workflow.approved &&
-      !x.workflow.deposited
-  ).length;
-  const depositedCount = withWorkflow.filter((x) => x.workflow.deposited)
-    .length;
+  const bankDepositsPendingCount = React.useMemo(
+    () => ledger.bankDeposits.filter((x) => x.depositConfirmed === false).length,
+    [ledger.bankDeposits]
+  );
+
+  const bankDepositsConfirmedCount = React.useMemo(
+    () => ledger.bankDeposits.filter((x) => x.depositConfirmed !== false).length,
+    [ledger.bankDeposits]
+  );
+
+  const safeAddsTotal = React.useMemo(
+    () => ledger.safeAdds.reduce((a, x) => a + x.amount, 0),
+    [ledger.safeAdds]
+  );
+
+  const safeToBankTotal = React.useMemo(
+    () => ledger.safeToBank.reduce((a, x) => a + x.amount, 0),
+    [ledger.safeToBank]
+  );
 
   const daily = React.useMemo(() => {
-    const routed = attachRouting(baseRows, BANK_SAFE_CUTOFF);
-    let postSafe = 0;
-    let prePending = 0;
-    for (const r of routed) {
-      const w = withWorkflow.find((v) => v.row.id === r.id)?.workflow;
-      if (r.routing === "post_cutoff_safe") {
-        if (w?.approved) {
-          postSafe += r.mpsTotal;
-        }
-        continue;
-      }
-      if (w?.approved && r.routing === "pre_cutoff_bank" && !w.deposited) {
-        prePending += r.mpsTotal;
-      }
-    }
-    const sameDayBank = bankInfo?.totalAmount ?? 0;
-    return computeDailyCashPosition({
-      openingSafeBalance: carryForwardOpening,
+    return computeDailyCashPositionLedger({
+      openingSafeBalance,
       todayEncashmentsGross: sumMpsTotal(baseRows),
-      sameDayBankDeposit: sameDayBank,
-      postCutoffToSafe: postSafe,
-      preCutoffPendingBank: prePending,
+      manualAdjustmentsTotal: manualAdjTotal,
+      bankDepositsTotal: bankDepositsConfirmedTotal,
+      safeAddsTotal,
+      safeToBankTotal,
     });
-  }, [baseRows, withWorkflow, bankInfo, carryForwardOpening]);
+  }, [
+    openingSafeBalance,
+    baseRows,
+    manualAdjTotal,
+    bankDepositsConfirmedTotal,
+    safeAddsTotal,
+    safeToBankTotal,
+  ]);
 
   const dailyRows: { labelKey: MessageKey; get: (d: typeof daily) => number }[] = React.useMemo(
     () => [
+      { labelKey: "encashment.rowOpeningSafeRead", get: (d) => d.openingSafeBalance },
       { labelKey: "encashment.rowTodayGross", get: (d) => d.todayEncashments },
-      { labelKey: "encashment.rowBankDeposit", get: (d) => d.sameDayBankDeposit },
-      { labelKey: "encashment.rowPostSafe", get: (d) => d.postCutoffToSafe },
-      { labelKey: "encashment.rowPrePending", get: (d) => d.preCutoffPendingBank },
+      { labelKey: "encashment.rowManualAdj", get: (d) => d.manualAdjustmentsTotal },
+      { labelKey: "encashment.rowBankDeposit", get: (d) => d.bankDepositsTotal },
+      { labelKey: "encashment.rowSafeAdds", get: (d) => d.safeAddsTotal },
+      { labelKey: "encashment.rowSafeToBank", get: (d) => d.safeToBankTotal },
       { labelKey: "encashment.rowCurrentSafe", get: (d) => d.currentSafeBalance },
       { labelKey: "encashment.rowGrand", get: (d) => d.grandTotal },
     ],
@@ -243,6 +250,38 @@ export default function EncashmentControlPage() {
   function onGet() {
     setNonce((n) => n + 1);
     toast({ title: t("encashment.toastRefreshTitle"), description: t("encashment.toastRefreshDesc") });
+  }
+
+  function handleRouteLineToOfficeSafe(rowId: string) {
+    const item = withWorkflow.find((x) => x.row.id === rowId);
+    if (!item?.workflow.approved) return;
+    const amt =
+      item.row.mpsTotal + sumManualAdjustmentsForRow(item.workflow);
+    if (amt <= 0) {
+      toast({
+        title: t("encashment.toastInvalidAmountTitle"),
+        variant: "destructive",
+      });
+      return;
+    }
+    const ok = routeRowToOfficeSafe(rowId, amt, item.row.kioskId);
+    if (!ok) {
+      toast({
+        title: t("encashment.toastSafeAlreadyBookedTitle"),
+        description: t("encashment.toastSafeAlreadyBookedDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: t("encashment.toastRouteSafeTitle"), description: formatCurrency(amt, "TRY", { maximumFractionDigits: 2 }) });
+  }
+
+  function handleRelaySafeToBank(safeAddId: string) {
+    relaySafeAddToBank(safeAddId);
+    toast({
+      title: t("encashment.toastRelayBankTitle"),
+      description: t("encashment.toastRelayBankDesc"),
+    });
   }
 
   if (!hydrated) {
@@ -346,14 +385,13 @@ export default function EncashmentControlPage() {
               value={wfFilter}
               onValueChange={(v) => setWfFilter(v as WorkflowFilter)}
             >
-              <SelectTrigger className="h-9 w-[160px] text-xs">
+              <SelectTrigger className="h-9 w-[180px] text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("encashment.wfAll")}</SelectItem>
+                <SelectItem value="pending_review">{t("encashment.wfPendingReview")}</SelectItem>
                 <SelectItem value="approved">{t("encashment.wfApproved")}</SelectItem>
-                <SelectItem value="in_safe">{t("encashment.wfInSafe")}</SelectItem>
-                <SelectItem value="deposited">{t("encashment.wfDeposited")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -376,16 +414,25 @@ export default function EncashmentControlPage() {
           tone="success"
         />
         <KpiCard
-          label={t("encashment.kpiInSafe")}
-          value={inSafeCount}
-          sub={t("encashment.kpiInSafeSub")}
+          label={t("encashment.kpiSafeBalance")}
+          value={daily.currentSafeBalance}
+          format={(v) =>
+            formatCurrency(v, "TRY", { maximumFractionDigits: 2 })
+          }
+          sub={t("encashment.kpiSafeBalanceSub")}
           icon={Wallet}
           tone="info"
         />
         <KpiCard
-          label={t("encashment.kpiDeposited")}
-          value={depositedCount}
-          sub={bankInfo ? t("encashment.kpiBatch", { id: bankInfo.batchId }) : t("encashment.kpiNoBatch")}
+          label={t("encashment.kpiBankLedger")}
+          value={bankDepositsConfirmedTotal}
+          format={(v) =>
+            formatCurrency(v, "TRY", { maximumFractionDigits: 2 })
+          }
+          sub={t("encashment.kpiBankLedgerSubV2", {
+            confirmed: bankDepositsConfirmedCount,
+            pending: bankDepositsPendingCount,
+          })}
           icon={Landmark}
           tone="brand"
         />
@@ -394,41 +441,25 @@ export default function EncashmentControlPage() {
       <div className="space-y-5">
         <div>
           <h2 className="mb-2 text-sm font-semibold">
-            {t("encashment.preHeader")}
+            {t("encashment.tableHeader")}
           </h2>
           <EncashmentReportTable
-            mode="pre"
-            items={preTableRows}
+            items={filtered}
+            officeSafeBookedRowIds={officeSafeBookedRowIds}
+            ledgerBankDeposits={ledger.bankDeposits}
             onToggleReview={toggleReview}
             onApprove={approveRow}
             onToggleException={setExceptionFlag}
-          />
-        </div>
-        <div>
-          <h2 className="mb-2 text-sm font-semibold">
-            {t("encashment.postHeader")}
-          </h2>
-          <p className="mb-2 text-xs text-muted-foreground">
-            {t("encashment.postNote")}
-          </p>
-          {postTableRows.length === 0 ? (
-            <p className="mb-2 text-xs text-muted-foreground">
-              {t("encashment.postEmpty")}
-            </p>
-          ) : null}
-          <EncashmentReportTable
-            mode="post"
-            items={postTableRows}
-            onToggleReview={toggleReview}
-            onApprove={approveRow}
-            onToggleException={setExceptionFlag}
+            onAddManualAdjustment={addManualAdjustment}
+            onRemoveManualAdjustment={removeManualAdjustment}
+            onRouteLineToOfficeSafe={handleRouteLineToOfficeSafe}
+            onConfirmBankDeposit={confirmBankDeposit}
+            onRecordBankDepositForRow={recordBankDepositFromEncashmentRow}
           />
         </div>
         <p className="text-[11px] text-muted-foreground">
-          {t("encashment.rowCount", {
+          {t("encashment.rowCountSingle", {
             n: filtered.length,
-            pre: preTableRows.length,
-            post: postTableRows.length,
           })}
         </p>
       </div>
@@ -442,17 +473,6 @@ export default function EncashmentControlPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-2 border-b border-border/60 py-1.5">
-              <span className="text-muted-foreground">{t("encashment.openingSafe")}</span>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  className="h-8 w-36 text-right text-xs tabular-nums"
-                  value={carryForwardOpening}
-                  onChange={(e) => setCarryForwardOpening(Number(e.target.value) || 0)}
-                />
-              </div>
-            </div>
             {dailyRows.map((row) => (
               <div
                 key={row.labelKey}
@@ -469,71 +489,74 @@ export default function EncashmentControlPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">{t("encashment.bankBulk")}</CardTitle>
-            <CardDescription>
-              {t("encashment.bankBulkSub")}
-            </CardDescription>
+            <CardTitle className="text-sm">{t("encashment.ledgerActions")}</CardTitle>
+            <CardDescription>{t("encashment.ledgerActionsSub")}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {bankInfo ? (
-              <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm">
-                <div className="font-medium text-success">{t("encashment.bankDeposited")}</div>
-                <div className="text-xs text-muted-foreground">
-                  {t("encashment.kpiBatch", { id: bankInfo.batchId })} ·{" "}
-                  {new Date(bankInfo.at).toLocaleString(dateLocale)} ·{" "}
-                  {formatCurrency(bankInfo.totalAmount, "TRY", { maximumFractionDigits: 2 })}
-                </div>
+          <CardContent className="space-y-6">
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("encashment.safeAddSection")}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("encashment.bankNoBatch")}
-              </p>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                disabled={!!bankInfo}
-                onClick={() => {
-                  const r = confirmBulkBankDeposit();
-                  if (r.ok) {
-                    toast({
-                      title: t("encashment.toastBankTitle"),
-                      description: `${r.batchId} · ${formatCurrency(r.totalAmount, "TRY", { maximumFractionDigits: 2 })}`,
-                    });
-                  } else {
-                    toast({
-                      title: t("encashment.toastNoDepositTitle"),
-                      description: mapDepositReason(r.reason, t),
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                <Landmark className="mr-2 h-4 w-4" />
-                {t("encashment.confirmBank")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (
-                    !confirm(
-                      t("encashment.resetConfirm")
-                    )
-                  ) {
-                    return;
-                  }
-                  resetReportDemo();
-                  toast({ title: t("encashment.resetToastTitle"), description: t("encashment.resetToastDesc") });
-                }}
-              >
-                {t("encashment.resetDemo")}
-              </Button>
+              <p className="text-[11px] text-muted-foreground">{t("encashment.safeManualClosedHint")}</p>
+              {ledger.safeAdds.length ? (
+                <ul className="mt-2 space-y-1 text-xs">
+                  {ledger.safeAdds.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5"
+                    >
+                      <span className="min-w-0 flex-1">
+                        {s.kioskLabel ? (
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {s.kioskLabel}
+                            {" · "}
+                          </span>
+                        ) : null}
+                        {formatCurrency(s.amount, "TRY", { maximumFractionDigits: 2 })} ·{" "}
+                        {new Date(s.at).toLocaleString(dateLocale)}
+                      </span>
+                      <div className="flex shrink-0 flex-wrap items-center gap-1">
+                        {s.safeToBankEntryId ? (
+                          <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                            {t("encashment.safeRelayQueuedBadge")}
+                          </span>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 gap-1 px-2 text-[11px]"
+                            onClick={() => handleRelaySafeToBank(s.id)}
+                          >
+                            <Landmark className="h-3.5 w-3.5" />
+                            {t("encashment.safeRelayToBankBtn")}
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">{t("encashment.safeAddsEmpty")}</p>
+              )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              {t("encashment.demoNote")}
-            </p>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!confirm(t("encashment.resetConfirm"))) return;
+                resetReportDemo();
+                toast({
+                  title: t("encashment.resetToastTitle"),
+                  description: t("encashment.resetToastDesc"),
+                });
+              }}
+            >
+              {t("encashment.resetDemo")}
+            </Button>
+            <p className="text-[11px] text-muted-foreground">{t("encashment.demoNote")}</p>
           </CardContent>
         </Card>
       </div>

@@ -98,6 +98,17 @@ export function topMerchants(
   ).slice(0, n);
 }
 
+export function kioskStatusSegment(k: Kiosk): string {
+  if (
+    k.status === "OK" &&
+    (k.paperStatus === "Near end" ||
+      (k.statusDetail ?? "").toLowerCase().includes("paper near end"))
+  ) {
+    return "Paper Warning";
+  }
+  return k.status;
+}
+
 export function kioskStatusBreakdown() {
   const buckets: Record<string, number> = {
     OK: 0,
@@ -107,11 +118,8 @@ export function kioskStatusBreakdown() {
     "Not Found": 0,
   };
   for (const k of kiosks) {
-    if (k.status === "OK" && (k.paperStatus === "Near end" || k.statusDetail.toLowerCase().includes("paper near end"))) {
-      buckets["Paper Warning"] += 1;
-    } else {
-      buckets[k.status] = (buckets[k.status] ?? 0) + 1;
-    }
+    const seg = kioskStatusSegment(k);
+    buckets[seg] = (buckets[seg] ?? 0) + 1;
   }
   return Object.entries(buckets)
     .filter(([, v]) => v > 0)
@@ -216,22 +224,6 @@ export function segmentSeries(days = 7) {
     });
   }
   return out;
-}
-
-export function hourlyHeatmap() {
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  return days
-    .map((day, di) =>
-      Array.from({ length: 24 }, (_, h) => {
-        let weight = 0.2;
-        if (h >= 8 && h <= 22) weight = 0.45 + Math.sin(((h - 8) / 14) * Math.PI) * 0.6;
-        if (di === 5) weight *= 1.25;
-        if (di === 6) weight *= 0.7;
-        const value = Math.round(weight * (400 + seeded(di * 24 + h) * 900));
-        return { day, hour: h, value };
-      })
-    )
-    .flat();
 }
 
 export function kioskGroupedByDealer() {

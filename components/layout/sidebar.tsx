@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Activity,
-  Building2,
   MonitorSmartphone,
   ShoppingBag,
   ChevronDown,
@@ -18,7 +17,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type NavChild = {
-  labelKey: "nav.general" | "nav.kiosks" | "nav.psp" | "nav.dealers";
+  labelKey: "nav.general" | "nav.kiosks" | "nav.psp";
   href: string;
   icon: React.ComponentType<{ className?: string }>;
 };
@@ -48,7 +47,6 @@ const navItems: NavItem[] = [
       { labelKey: "nav.general", href: "/dashboard", icon: Activity },
       { labelKey: "nav.kiosks", href: "/dashboard/mps", icon: MonitorSmartphone },
       { labelKey: "nav.psp", href: "/dashboard/psp", icon: ShoppingBag },
-      { labelKey: "nav.dealers", href: "/dashboard/dealers", icon: Building2 },
     ],
   },
   {

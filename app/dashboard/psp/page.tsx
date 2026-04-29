@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -13,12 +14,13 @@ import {
   YAxis,
 } from "recharts";
 import {
-  Activity,
+  Building2,
   CheckCircle2,
-  ExternalLink,
+  ChevronRight,
+  CreditCard,
   Gauge,
-  Globe,
   ShoppingBag,
+  Smartphone,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -29,7 +31,6 @@ import { ChartCard } from "@/components/dashboard/chart-card";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { SegmentToggle } from "@/components/dashboard/segment-toggle";
-import { DataTable, type Column } from "@/components/dashboard/data-table";
 import {
   ChartTooltip,
   compactCurrencyFormatter,
@@ -41,20 +42,64 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { type PresetId } from "@/components/dashboard/date-range-picker";
 import {
   KPI,
   MERCHANT_MONTH_TURNOVER,
-  hourlyHeatmap,
   monthlyTurnoverSeries,
   topMerchants,
 } from "@/lib/aggregations";
 import { merchants } from "@/lib/data/merchants";
+import {
+  OWN_PRODUCT_DAILY_CHART_MAX_DAYS,
+  type OwnProductId,
+  ownProductCashCardAmounts,
+  ownProductDailyCashCardSeries,
+  ownProductMonthlyTrend,
+  ownProductSnapshot,
+} from "@/lib/data/psp-own-products";
 import type { Merchant } from "@/lib/data/types";
-import { useI18n } from "@/lib/i18n";
-import { HEATMAP_DAY_LABEL } from "@/lib/i18n/calendar-days";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { merchantStatusLabel } from "@/lib/i18n/merchant-status";
+
+type OwnProductConfig = {
+  id: OwnProductId;
+  icon: React.ComponentType<{ className?: string }>;
+  iconWrap: string;
+};
+
+const OWN_PRODUCT_LIST: OwnProductConfig[] = [
+  {
+    id: "adakart",
+    icon: Smartphone,
+    iconWrap: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  },
+  {
+    id: "kartbuy",
+    icon: CreditCard,
+    iconWrap: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+  },
+  {
+    id: "paypointCyprus",
+    icon: Building2,
+    iconWrap: "bg-primary/15 text-primary",
+  },
+];
+
+const OWN_TITLE: Record<OwnProductId, MessageKey> = {
+  adakart: "dashboard.psp.own.adakart.title",
+  kartbuy: "dashboard.psp.own.kartbuy.title",
+  paypointCyprus: "dashboard.psp.own.paypointCyprus.title",
+};
+
+const OWN_SUB: Record<OwnProductId, MessageKey> = {
+  adakart: "dashboard.psp.own.adakart.sub",
+  kartbuy: "dashboard.psp.own.kartbuy.sub",
+  paypointCyprus: "dashboard.psp.own.paypointCyprus.sub",
+};
 
 export default function PspDashboardPage() {
   const { t } = useI18n();
@@ -62,6 +107,7 @@ export default function PspDashboardPage() {
   const [, setNonce] = React.useState(0);
   const [by, setBy] = React.useState<"monthTurnover" | "txCount">("monthTurnover");
   const [selected, setSelected] = React.useState<Merchant | null>(null);
+  const [ownProduct, setOwnProduct] = React.useState<OwnProductId | null>(null);
 
   const top = topMerchants(25, by);
   const trend = monthlyTurnoverSeries(12);
@@ -69,83 +115,12 @@ export default function PspDashboardPage() {
     () => [...merchants].sort((a, b) => b.monthTurnover - a.monthTurnover).slice(0, 3),
     []
   );
-  const heatmap = hourlyHeatmap();
-  const maxHeat = React.useMemo(
-    () => Math.max(...heatmap.map((c) => c.value)),
-    [heatmap]
-  );
-
   const activeMerchants = merchants.filter((m) => m.status === "Active").length;
   const avgTicket = React.useMemo(() => {
     const total = merchants.reduce((a, m) => a + m.monthTurnover, 0);
     const tx = merchants.reduce((a, m) => a + m.txCount, 0);
     return tx > 0 ? total / tx : 0;
   }, []);
-
-  const columns: Column<Merchant>[] = React.useMemo(
-    () => [
-    {
-      key: "id",
-      header: t("dashboard.psp.colMerchantId"),
-      sortable: true,
-      width: "88px",
-      format: (r) => (
-        <span className="font-mono text-xs tabular-nums">{r.id}</span>
-      ),
-    },
-    { key: "name", header: t("dashboard.psp.colMerchant"), sortable: true },
-    {
-      key: "website",
-      header: t("dashboard.psp.colWebsite"),
-      format: (r) => (
-        <a
-          href={
-            r.website.startsWith("http")
-              ? r.website
-              : `https://${r.website.replace(/^www\./, "")}`
-          }
-          onClick={(e) => e.stopPropagation()}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-primary hover:underline"
-        >
-          <Globe className="h-3 w-3" />
-          <span className="truncate">{r.website.replace(/^www\./, "")}</span>
-          <ExternalLink className="h-3 w-3 opacity-60" />
-        </a>
-      ),
-    },
-    { key: "registered", header: t("dashboard.psp.colRegistered"), sortable: true },
-    {
-      key: "status",
-      header: t("common.status"),
-      format: (r) => (
-        <StatusBadge tone={r.status === "Active" ? "success" : "muted"}>
-          {merchantStatusLabel(r.status, t)}
-        </StatusBadge>
-      ),
-    },
-    {
-      key: "txCount",
-      header: t("dashboard.psp.colTxCount"),
-      align: "right",
-      sortable: true,
-      format: (r) => formatNumber(r.txCount, { maximumFractionDigits: 0 }),
-    },
-    {
-      key: "monthTurnover",
-      header: t("dashboard.psp.colMonthTurnover"),
-      align: "right",
-      sortable: true,
-      format: (r) => (
-        <span className="font-semibold">
-          {formatCurrency(r.monthTurnover, "TRY", { maximumFractionDigits: 0 })}
-        </span>
-      ),
-    },
-  ],
-    [t]
-  );
 
   return (
     <div className="space-y-6">
@@ -199,6 +174,70 @@ export default function PspDashboardPage() {
           tone="brand"
         />
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("dashboard.psp.ownProductsTitle")}</CardTitle>
+          <p className="text-xs text-muted-foreground">{t("dashboard.psp.ownProductsDesc")}</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {OWN_PRODUCT_LIST.map(({ id, icon: Icon, iconWrap }) => {
+              const snap = ownProductSnapshot(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setOwnProduct(id)}
+                  className={cn(
+                    "group flex flex-col rounded-xl border border-border bg-card p-4 text-left transition-colors",
+                    "hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span
+                      className={cn(
+                        "grid h-10 w-10 shrink-0 place-items-center rounded-lg",
+                        iconWrap
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                  </div>
+                  <div className="mt-3 font-semibold leading-tight">
+                    {t(OWN_TITLE[id])}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                    {t(OWN_SUB[id])}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-border/60 pt-3 text-sm">
+                    <span className="font-semibold tabular-nums">
+                      {formatCurrency(snap.monthAmount, "TRY", {
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                      {formatNumber(snap.monthTx, { maximumFractionDigits: 0 })}{" "}
+                      {t("common.tx")}
+                    </span>
+                  </div>
+                  <span
+                    className={cn(
+                      "mt-1 text-[11px] tabular-nums",
+                      snap.momPct >= 0 ? "text-success" : "text-destructive"
+                    )}
+                  >
+                    {t("dashboard.psp.own.sheetMom", {
+                      n: snap.momPct.toFixed(1),
+                    })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <ChartCard
@@ -320,184 +359,51 @@ export default function PspDashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <ChartCard
-          className="lg:col-span-2"
-          title={t("dashboard.psp.monthlyTrend")}
-          description={t("dashboard.psp.monthlyTrendDesc")}
-          contentClassName="h-[280px]"
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trend} margin={{ left: -14, right: 8, top: 8 }}>
-              <CartesianGrid
-                strokeDasharray="4 4"
-                vertical={false}
-                stroke="hsl(var(--border))"
-              />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={compactCurrencyFormatter}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                content={
-                  <ChartTooltip valueFormatter={compactCurrencyFormatter} />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="psp"
-                name={t("dashboard.psp.linePspTurnover")}
-                stroke="#3B82F6"
-                strokeWidth={2.5}
-                dot={{ r: 3, fill: "#3B82F6" }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      <ChartCard
+        title={t("dashboard.psp.monthlyTrend")}
+        description={t("dashboard.psp.monthlyTrendDesc")}
+        contentClassName="h-[280px]"
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={trend} margin={{ left: -14, right: 8, top: 8 }}>
+            <CartesianGrid
+              strokeDasharray="4 4"
+              vertical={false}
+              stroke="hsl(var(--border))"
+            />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tickFormatter={compactCurrencyFormatter}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              content={<ChartTooltip valueFormatter={compactCurrencyFormatter} />}
+            />
+            <Line
+              type="monotone"
+              dataKey="psp"
+              name={t("dashboard.psp.linePspTurnover")}
+              stroke="#3B82F6"
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: "#3B82F6" }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" /> {t("dashboard.psp.recentSignups")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {[...merchants]
-              .sort(
-                (a, b) =>
-                  new Date(b.registered).getTime() - new Date(a.registered).getTime()
-              )
-              .slice(0, 6)
-              .map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs"
-                >
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary font-semibold">
-                    {m.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{m.name}</div>
-                    <div className="text-muted-foreground">
-                      ID {m.id} · {m.registered}
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">{t("dashboard.psp.heatmap")}</CardTitle>
-          <div className="mt-0.5 text-xs text-muted-foreground">
-            {t("dashboard.psp.heatmapSub")}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="scrollbar-thin overflow-x-auto">
-            <div className="inline-block min-w-full">
-              <div className="grid grid-cols-[28px_repeat(24,1fr)] gap-0.5 text-[10px] text-muted-foreground">
-                <span />
-                {Array.from({ length: 24 }, (_, h) => (
-                  <span key={h} className="py-0.5 text-center">
-                    {h.toString().padStart(2, "0")}
-                  </span>
-                ))}
-              </div>
-              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <div
-                  key={day}
-                  className="mt-0.5 grid grid-cols-[28px_repeat(24,1fr)] gap-0.5"
-                >
-                  <span className="self-center text-right text-[10px] font-medium text-muted-foreground pr-1">
-                    {t(HEATMAP_DAY_LABEL[day] ?? "calendar.mon")}
-                  </span>
-                  {heatmap
-                    .filter((c) => c.day === day)
-                    .map((c) => {
-                      const intensity = c.value / maxHeat;
-                      return (
-                        <div
-                          key={`${c.day}-${c.hour}`}
-                          className="group relative h-6 rounded-sm"
-                          style={{
-                            backgroundColor: `rgba(231, 76, 60, ${0.06 + intensity * 0.9})`,
-                          }}
-                          title={t("dashboard.psp.heatmapTitleFmt", {
-                            day: t(HEATMAP_DAY_LABEL[c.day] ?? "calendar.mon"),
-                            hour: c.hour,
-                            n: formatNumber(c.value),
-                          })}
-                        />
-                      );
-                    })}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
-            <span>{t("common.less")}</span>
-            <div className="flex gap-0.5">
-              {[0.1, 0.3, 0.5, 0.7, 0.9].map((v) => (
-                <span
-                  key={v}
-                  className="h-2 w-4 rounded-sm"
-                  style={{ backgroundColor: `rgba(231, 76, 60, ${v})` }}
-                />
-              ))}
-            </div>
-            <span>{t("common.more")}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-sm">{t("dashboard.psp.merchantsDir")}</CardTitle>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                {t("dashboard.psp.merchantsDirSub", { n: merchants.length })}
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <DataTable<Merchant>
-            rows={merchants}
-            columns={columns}
-            rowKey={(m) => m.id}
-            onRowClick={setSelected}
-            searchKeys={["name", "website"]}
-            searchPlaceholder={t("dashboard.psp.searchMerchants")}
-            pageSize={10}
-            initialSort={{ key: "monthTurnover", dir: "desc" }}
-            exportName="merchants.csv"
-            filters={[
-              {
-                id: "status",
-                label: t("common.status"),
-                options: [
-                  { value: "Active", label: t("common.merchantStatusActive") },
-                  { value: "Inactive", label: t("common.merchantStatusInactive") },
-                ],
-                predicate: (m, v) => m.status === v,
-              },
-            ]}
-          />
-        </CardContent>
-      </Card>
+      <OwnProductDetailSheet
+        productId={ownProduct}
+        open={ownProduct !== null}
+        onOpenChange={(o) => !o && setOwnProduct(null)}
+      />
 
       <MerchantDetailSheet
         open={Boolean(selected)}
@@ -505,6 +411,336 @@ export default function PspDashboardPage() {
         merchant={selected}
       />
     </div>
+  );
+}
+
+function toInputDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseInputDate(s: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (
+    dt.getFullYear() !== y ||
+    dt.getMonth() !== m - 1 ||
+    dt.getDate() !== d
+  ) {
+    return null;
+  }
+  return dt;
+}
+
+function daysInclusiveSheet(a: Date, b: Date): number {
+  const start = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const end = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  if (end < start) return 0;
+  return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+function OwnProductDetailSheet({
+  productId,
+  open,
+  onOpenChange,
+}: {
+  productId: OwnProductId | null;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const [fromInput, setFromInput] = React.useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 6);
+    return toInputDate(start);
+  });
+  const [toInput, setToInput] = React.useState(() => toInputDate(new Date()));
+
+  React.useEffect(() => {
+    if (!open || !productId) return;
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 6);
+    setToInput(toInputDate(end));
+    setFromInput(toInputDate(start));
+  }, [open, productId]);
+
+  const trend = React.useMemo(
+    () => (productId ? ownProductMonthlyTrend(productId) : []),
+    [productId]
+  );
+  const snap = React.useMemo(
+    () => (productId ? ownProductSnapshot(productId) : null),
+    [productId]
+  );
+  const cashCard = React.useMemo(
+    () => (productId ? ownProductCashCardAmounts(productId) : null),
+    [productId]
+  );
+
+  const rangeStart = parseInputDate(fromInput);
+  const rangeEnd = parseInputDate(toInput);
+  const rangeOk = Boolean(rangeStart && rangeEnd && rangeStart <= rangeEnd);
+  const spanDays =
+    rangeOk && rangeStart && rangeEnd
+      ? daysInclusiveSheet(rangeStart, rangeEnd)
+      : 0;
+  const rangeCapped =
+    rangeOk && spanDays > OWN_PRODUCT_DAILY_CHART_MAX_DAYS;
+  const dailySeries =
+    rangeOk && productId && rangeStart && rangeEnd
+      ? ownProductDailyCashCardSeries(productId, rangeStart, rangeEnd)
+      : [];
+
+  function applyPresetDayCount(n: number) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - (n - 1));
+    setToInput(toInputDate(end));
+    setFromInput(toInputDate(start));
+  }
+
+  if (!productId) return null;
+
+  const cashPct = cashCard?.cashPct ?? 0;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="flex max-h-[90vh] w-full flex-col overflow-y-auto sm:max-w-xl">
+        <SheetHeader className="space-y-1 text-left">
+          <div className="flex items-center gap-2 text-primary">
+            <ShoppingBag className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              {t("dashboard.psp.ownProductBadge")}
+            </span>
+          </div>
+          <SheetTitle>{t(OWN_TITLE[productId])}</SheetTitle>
+          <SheetDescription>{t(OWN_SUB[productId])}</SheetDescription>
+        </SheetHeader>
+
+        {snap ? (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-border p-3">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t("dashboard.psp.kpiMonth")}
+              </div>
+              <div className="mt-1 text-lg font-semibold tabular-nums">
+                {formatCurrency(snap.monthAmount, "TRY", { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t("dashboard.psp.colTxCount")}
+              </div>
+              <div className="mt-1 text-lg font-semibold tabular-nums">
+                {formatNumber(snap.monthTx, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-5 space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("dashboard.psp.own.sheetTrendTitle")}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {t("dashboard.psp.own.sheetTrendDesc")}
+          </p>
+        </div>
+        <div className="mt-2 h-[220px] w-full min-h-0 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trend} margin={{ left: -18, right: 8, top: 8, bottom: 0 }}>
+              <CartesianGrid
+                strokeDasharray="4 4"
+                vertical={false}
+                stroke="hsl(var(--border))"
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={compactCurrencyFormatter}
+                axisLine={false}
+                tickLine={false}
+                width={56}
+              />
+              <Tooltip
+                content={<ChartTooltip valueFormatter={compactCurrencyFormatter} />}
+              />
+              <Line
+                type="monotone"
+                dataKey="amount"
+                name={t("dashboard.psp.own.lineAmount")}
+                stroke="#3B82F6"
+                strokeWidth={2}
+                dot={{ r: 3, fill: "#3B82F6" }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-border p-3">
+          <div className="mb-2 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{t("common.cashCardMix")}</span>
+            <span className="tabular-nums font-semibold">
+              {t("common.pctCash", { n: cashPct.toFixed(1) })}
+            </span>
+          </div>
+          <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-warning" style={{ width: `${cashPct}%` }} />
+            <div
+              className="h-full bg-info"
+              style={{ width: `${Math.max(0, 100 - cashPct)}%` }}
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>{t("common.cashLabel")}</span>
+            <span>{t("common.cardLabel")}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-border p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.mps.sheetDailyCashCardTitle")}
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {t("dashboard.mps.sheetDailyCashCardDesc")}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => applyPresetDayCount(7)}
+              >
+                {t("dashboard.mps.sheetRangePreset7")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => applyPresetDayCount(30)}
+              >
+                {t("dashboard.mps.sheetRangePreset30")}
+              </Button>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label
+                htmlFor="own-chart-from"
+                className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                {t("dashboard.mps.sheetRangeFrom")}
+              </label>
+              <Input
+                id="own-chart-from"
+                type="date"
+                value={fromInput}
+                onChange={(e) => setFromInput(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="own-chart-to"
+                className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                {t("dashboard.mps.sheetRangeTo")}
+              </label>
+              <Input
+                id="own-chart-to"
+                type="date"
+                value={toInput}
+                onChange={(e) => setToInput(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+          {!rangeOk ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {t("dashboard.mps.sheetRangeInvalid")}
+            </p>
+          ) : null}
+          {rangeCapped ? (
+            <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-500">
+              {t("dashboard.mps.sheetRangeCapped", {
+                n: OWN_PRODUCT_DAILY_CHART_MAX_DAYS,
+              })}
+            </p>
+          ) : null}
+          <div className="mt-3 h-[200px] w-full min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={dailySeries}
+                margin={{ left: -18, right: 4, top: 8, bottom: 4 }}
+                barCategoryGap="14%"
+                barGap={4}
+              >
+                <CartesianGrid
+                  strokeDasharray="4 4"
+                  vertical={false}
+                  stroke="hsl(var(--border))"
+                />
+                <XAxis
+                  dataKey="day"
+                  tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={
+                    dailySeries.length > 18
+                      ? Math.floor(dailySeries.length / 10)
+                      : 0
+                  }
+                  angle={-22}
+                  textAnchor="end"
+                  height={dailySeries.length > 18 ? 52 : 44}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickFormatter={compactCurrencyFormatter}
+                  axisLine={false}
+                  tickLine={false}
+                  width={52}
+                />
+                <Tooltip
+                  content={<ChartTooltip valueFormatter={compactCurrencyFormatter} />}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <Bar
+                  dataKey="cash"
+                  name={t("common.cash")}
+                  fill="#EAB308"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={32}
+                />
+                <Bar
+                  dataKey="card"
+                  name={t("common.card")}
+                  fill="#3B82F6"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={32}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

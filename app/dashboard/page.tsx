@@ -21,7 +21,6 @@ import {
   CreditCard,
   LineChart as LineChartIcon,
   MonitorSmartphone,
-  ShoppingBag,
   Wallet,
 } from "lucide-react";
 
@@ -30,7 +29,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { ChartCard } from "@/components/dashboard/chart-card";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { SegmentToggle } from "@/components/dashboard/segment-toggle";
 import {
   ChartTooltip,
   compactCurrencyFormatter,
@@ -39,7 +37,6 @@ import { type PresetId } from "@/components/dashboard/date-range-picker";
 import {
   KPI,
   TOTAL_TURNOVER,
-  kioskGroupedByDealer,
   kioskStatusBreakdown,
   monthlyTurnoverSeries,
   regionKioskShareByCity,
@@ -64,7 +61,6 @@ export default function GeneralDashboardPage() {
   const [preset, setPreset] = React.useState<PresetId>("month");
   const [nonce, setNonce] = React.useState(0);
   const [activeKpi, setActiveKpi] = React.useState<string | null>("turnover");
-  const [dealerBy, setDealerBy] = React.useState<"turnover" | "tx">("turnover");
 
   const monthly = React.useMemo(
     () => monthlyTurnoverSeries(12),
@@ -76,7 +72,6 @@ export default function GeneralDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [preset, nonce]
   );
-  const dealerMps = kioskGroupedByDealer().slice(0, 10);
   const statusBreak = kioskStatusBreakdown();
   const regionShare = regionKioskShareByCity(7);
 
@@ -99,7 +94,7 @@ export default function GeneralDashboardPage() {
         onRefresh={() => setNonce((n) => n + 1)}
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KpiCard
           label={t("dashboard.gen.kpiTotalTurnover")}
           value={KPI.totalTurnover}
@@ -156,16 +151,6 @@ export default function GeneralDashboardPage() {
           tone="warning"
           active={activeKpi === "kiosks"}
           onClick={() => setActiveKpi("kiosks")}
-        />
-        <KpiCard
-          label={t("dashboard.gen.kpiPspMerchants")}
-          value={KPI.pspMerchants}
-          sub={t("dashboard.gen.subActive", { n: KPI.pspActiveMerchants })}
-          icon={ShoppingBag}
-          delta={{ value: 11.3 }}
-          tone="info"
-          active={activeKpi === "psp"}
-          onClick={() => setActiveKpi("psp")}
         />
       </div>
 
@@ -303,15 +288,19 @@ export default function GeneralDashboardPage() {
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCard
-          title={t("dashboard.gen.segmentTitle")}
-          description={t("dashboard.gen.segmentDesc")}
-          contentClassName="h-[300px] min-h-0"
-        >
-          <div className="h-[300px] w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={segment} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
+      <ChartCard
+        title={t("dashboard.gen.segmentTitle")}
+        description={t("dashboard.gen.segmentDesc")}
+        contentClassName="h-[300px] min-h-0"
+      >
+        <div className="h-[300px] w-full min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={segment}
+              margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
+              barCategoryGap="18%"
+              barGap={4}
+            >
               <CartesianGrid
                 strokeDasharray="4 4"
                 vertical={false}
@@ -340,93 +329,22 @@ export default function GeneralDashboardPage() {
                 }
               />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-              <Bar dataKey="dms" stackId="a" fill="#E74C3C" name={t("dashboard.gen.barDms")} />
+              <Bar
+                dataKey="dms"
+                fill="#E74C3C"
+                name={t("dashboard.gen.barDms")}
+                radius={[6, 6, 0, 0]}
+              />
               <Bar
                 dataKey="psp"
-                stackId="a"
                 fill="#3B82F6"
                 name={t("dashboard.gen.barPsp")}
                 radius={[6, 6, 0, 0]}
               />
             </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard
-          title={t("dashboard.gen.topDealersTitle")}
-          description={t("dashboard.gen.topDealersDesc")}
-          contentClassName="h-[300px] min-h-0"
-          actions={
-            <SegmentToggle
-              value={dealerBy}
-              onChange={setDealerBy}
-              options={[
-                { id: "turnover", label: t("common.revenue") },
-                { id: "tx", label: t("common.transactions") },
-              ]}
-            />
-          }
-        >
-          <div className="h-[300px] w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={dealerMps.map((d, i) => {
-                const short =
-                  d.dealerName.length > 16
-                    ? d.dealerName.slice(0, 14) + "…"
-                    : d.dealerName;
-                return {
-                  label: `${i + 1}. ${short} (#${d.dealerId})`,
-                  value: dealerBy === "turnover" ? d.turnover : d.tx,
-                };
-              })}
-              margin={{ top: 4, right: 12, bottom: 4, left: 4 }}
-            >
-              <CartesianGrid
-                strokeDasharray="4 4"
-                horizontal={false}
-                stroke="hsl(var(--border))"
-              />
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={
-                  dealerBy === "turnover"
-                    ? compactCurrencyFormatter
-                    : (v: number) => formatNumber(v, { maximumFractionDigits: 0 })
-                }
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="label"
-                width={200}
-                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                axisLine={false}
-                tickLine={false}
-                interval={0}
-              />
-              <Tooltip
-                content={
-                  <ChartTooltip
-                    valueFormatter={
-                      dealerBy === "turnover"
-                        ? compactCurrencyFormatter
-                        : (v) => formatNumber(v, { maximumFractionDigits: 0 })
-                    }
-                    suffix={dealerBy === "tx" ? ` ${t("common.tx")}` : ""}
-                  />
-                }
-              />
-              <Bar dataKey="value" fill="#E74C3C" radius={[0, 6, 6, 0]} />
-            </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
-      </div>
+          </ResponsiveContainer>
+        </div>
+      </ChartCard>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

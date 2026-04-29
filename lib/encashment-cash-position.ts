@@ -1,95 +1,61 @@
 import type { EncashmentRowData } from "@/lib/data/encashment";
 
-export type EncashmentRouting = "pre_cutoff_bank" | "post_cutoff_safe";
-
-/** Fixed bank / office safe split — not user-configurable in the encashment UI. */
-export const BANK_SAFE_CUTOFF = "16:00";
-
-/** Parse "HH:mm" 24h */
-export function parseCutoff(cutoff: string): { hours: number; minutes: number } {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(cutoff.trim());
-  if (!m) return { hours: 16, minutes: 0 };
-  const hours = Math.min(23, Math.max(0, parseInt(m[1], 10)));
-  const minutes = Math.min(59, Math.max(0, parseInt(m[2], 10)));
-  return { hours, minutes };
-}
-
-/**
- * Same calendar day as `encashmentAt` (local) — compare only time against cutoff.
- */
-export function routeEncashment(
-  encashmentIso: string,
-  cutoff: string
-): EncashmentRouting {
-  const d = new Date(encashmentIso);
-  if (Number.isNaN(d.getTime())) return "post_cutoff_safe";
-  const { hours, minutes } = parseCutoff(cutoff);
-  const t = d.getHours() * 60 + d.getMinutes();
-  const c = hours * 60 + minutes;
-  return t < c ? "pre_cutoff_bank" : "post_cutoff_safe";
-}
+/** Single routing bucket — no time-based cutoff in the encashment UI. */
+export type EncashmentRouting = "standard";
 
 export interface RowWithMeta extends EncashmentRowData {
   routing: EncashmentRouting;
 }
 
-export function attachRouting(
-  rows: EncashmentRowData[],
-  cutoff: string
-): RowWithMeta[] {
+export function attachRouting(rows: EncashmentRowData[]): RowWithMeta[] {
   return rows.map((r) => ({
     ...r,
-    routing: routeEncashment(r.encashmentAt, cutoff),
+    routing: "standard" as const,
   }));
 }
 
-export interface DailyCashPositionInput {
+export interface DailyCashPositionLedgerInput {
   openingSafeBalance: number;
-  /** Sum of mpsTotal for all rows in the report (today’s encashments). */
+  /** Sum of MPS totals for rows in the report. */
   todayEncashmentsGross: number;
-  /**
-   * Amount approved and designated for same-day bank run (pre-cutoff bucket),
-   * after bulk deposit: counts as “bank deposit” for the day.
-   */
-  sameDayBankDeposit: number;
-  /**
-   * Sum of mpsTotal for post-cutoff rows (approved) — physically held to office safe same day.
-   */
-  postCutoffToSafe: number;
-  /**
-   * Sum of mpsTotal for pre-cutoff (approved) not yet in bank run — still “in flight” for bank.
-   * Optional display; 0 if everything pre-cut is either deposited or not approved.
-   */
-  preCutoffPendingBank: number;
+  /** Sum of manual review adjustments across rows. */
+  manualAdjustmentsTotal: number;
+  /** Total recorded bank deposits from table ledger (confirmed lines). */
+  bankDepositsTotal: number;
+  /** Cash physically added to office safe (manual). */
+  safeAddsTotal: number;
+  /** Amount moved from office safe to bank (ledger). */
+  safeToBankTotal: number;
 }
 
 /**
- * - Current safe: opening + post-cutoff encashments (staying in office) + any carry not banked
- *   Simplified: currentSafe = opening + postCutoffToSafe (pre-cut money leaves to bank, not in safe)
- * - Grand total: opening + today’s encashment gross (all kiosk collections + carry)
+ * Current safe = opening + manual safe adds − transfers from safe to bank.
+ * Grand total = opening + today's gross encashments + manual adjustments (for reconciliation view).
  */
-export function computeDailyCashPosition(
-  i: DailyCashPositionInput
-): {
+export function computeDailyCashPositionLedger(i: DailyCashPositionLedgerInput): {
   openingSafeBalance: number;
   todayEncashments: number;
-  sameDayBankDeposit: number;
-  postCutoffToSafe: number;
-  preCutoffPendingBank: number;
+  manualAdjustmentsTotal: number;
+  bankDepositsTotal: number;
+  safeAddsTotal: number;
+  safeToBankTotal: number;
   currentSafeBalance: number;
   grandTotal: number;
 } {
   const currentSafeBalance =
-    i.openingSafeBalance + i.postCutoffToSafe;
-  const grandTotal = i.openingSafeBalance + i.todayEncashmentsGross;
+    i.openingSafeBalance + i.safeAddsTotal - i.safeToBankTotal;
+  const grandTotal =
+    i.openingSafeBalance + i.todayEncashmentsGross + i.manualAdjustmentsTotal;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
   return {
-    openingSafeBalance: i.openingSafeBalance,
-    todayEncashments: i.todayEncashmentsGross,
-    sameDayBankDeposit: i.sameDayBankDeposit,
-    postCutoffToSafe: i.postCutoffToSafe,
-    preCutoffPendingBank: i.preCutoffPendingBank,
-    currentSafeBalance: Math.round(currentSafeBalance * 100) / 100,
-    grandTotal: Math.round(grandTotal * 100) / 100,
+    openingSafeBalance: round2(i.openingSafeBalance),
+    todayEncashments: round2(i.todayEncashmentsGross),
+    manualAdjustmentsTotal: round2(i.manualAdjustmentsTotal),
+    bankDepositsTotal: round2(i.bankDepositsTotal),
+    safeAddsTotal: round2(i.safeAddsTotal),
+    safeToBankTotal: round2(i.safeToBankTotal),
+    currentSafeBalance: round2(currentSafeBalance),
+    grandTotal: round2(grandTotal),
   };
 }
 
