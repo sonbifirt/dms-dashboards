@@ -14,7 +14,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  Building2,
   CheckCircle2,
   ChevronRight,
   CreditCard,
@@ -81,11 +80,6 @@ const OWN_PRODUCT_LIST: OwnProductConfig[] = [
     id: "kartbuy",
     icon: CreditCard,
     iconWrap: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
-  },
-  {
-    id: "paypointCyprus",
-    icon: Building2,
-    iconWrap: "bg-primary/15 text-primary",
   },
 ];
 
@@ -181,7 +175,7 @@ export default function PspDashboardPage() {
           <p className="text-xs text-muted-foreground">{t("dashboard.psp.ownProductsDesc")}</p>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {OWN_PRODUCT_LIST.map(({ id, icon: Icon, iconWrap }) => {
               const snap = ownProductSnapshot(id);
               return (

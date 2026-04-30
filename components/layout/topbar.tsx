@@ -43,7 +43,16 @@ export function TopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
     if (pathname.startsWith("/dashboard/mps/encashment")) {
       return t("topbar.titleEncashment");
     }
-    const map: Record<string, "topbar.titleGeneral" | "topbar.titleKiosks" | "topbar.titlePsp" | "topbar.titleDealers"> = {
+    if (pathname.startsWith("/dashboard/psp/paypoint-cyprus")) {
+      return t("topbar.titlePspPaypointCyprus");
+    }
+    const map: Record<
+      string,
+      | "topbar.titleGeneral"
+      | "topbar.titleKiosks"
+      | "topbar.titlePsp"
+      | "topbar.titleDealers"
+    > = {
       "/dashboard": "topbar.titleGeneral",
       "/dashboard/mps": "topbar.titleKiosks",
       "/dashboard/psp": "topbar.titlePsp",
