@@ -84,7 +84,7 @@ export default function EncashmentControlPage() {
         from,
         to,
         dealerId: dealerParam,
-        maxRows: 50,
+        maxRows: 15,
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }),
     [from, to, dealerParam, nonce]
